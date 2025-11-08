@@ -10,8 +10,8 @@ const app: FastifyInstance = buildApp(SERVICE_NAME);
 app.register(ws);
 
 async function registerRoutes(app: FastifyInstance) {
-	await app.register(healthRoutes, { prefix: `${API_PREFIX}/game` });
-	await app.register(gameRoutes, { prefix: `${API_PREFIX}/game` });
+	await app.register(healthRoutes, { prefix: `${API_PREFIX}/games` });
+	await app.register(gameRoutes, { prefix: `${API_PREFIX}/games` });
 }
 
 startServer(app, registerRoutes, HOST, PORT);
