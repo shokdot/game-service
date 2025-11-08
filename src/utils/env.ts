@@ -11,4 +11,4 @@ const env = envSchema.parse(process.env);
 export const PORT = env.PORT;
 export const HOST = env.HOST;
 export const SERVICE_TOKEN = env.SERVICE_TOKEN;
-export const SERVICE_NAME = 'USER_SERVICE';
+export const SERVICE_NAME = 'GAME_SERVICE';
