@@ -1,8 +1,8 @@
+import createGameHandler from "@controllers/createGame.controller.js";
+import wsHandler from "@controllers/ws.controller.js";
 import { FastifyInstance } from "fastify";
-import httpRoutes from "./http.route.js";
-import wsRoutes from "./ws.route.js";
 
 export default async function gameRoutes(app: FastifyInstance) {
-	app.register(httpRoutes);
-	app.register(wsRoutes, { prefix: '/ws' });
+	app.post('/', createGameHandler);
+	app.get('/ws/:roomId', { websocket: true }, wsHandler);
 };
