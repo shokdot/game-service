@@ -1,12 +1,21 @@
-import { gameManager } from "@services/game.manager.js";
 import { FastifyReply, FastifyRequest } from "fastify";
+import forceEndGame from "@services/forceEndGame.service.js";
 
-const forceEndGame = (request: FastifyRequest, reply: FastifyReply) => {
-	// const { roomId } = request.params as { roomId: string };
-	// const ended = gameManager.endGame(roomId);
-	// if (!ended) return reply.status(404).send({ error: 'Game not found' });
+const forceEndGameHandler = (request: FastifyRequest, reply: FastifyReply) => {
+	try {
 
-	// reply.send({ success: true, message: `Game for room ${roomId} ended` });
+		const { roomId } = request.params as { roomId: string };
+
+		forceEndGame(roomId);
+
+		reply.send({ success: true, message: `Game for room ${roomId} ended` }); //ref
+
+	}
+	catch (error: any) {
+		reply.status(500).send({ error: 'smth' }); //refactor it
+
+	}
+
 };
 
-export default forceEndGame;
+export default forceEndGameHandler;
