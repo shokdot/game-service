@@ -1,4 +1,4 @@
-import { GameInstance } from 'src/engine/game.instance.js';
+import { GameInstance } from 'src/game/GameInstance.js';
 import { WebSocket } from "ws";
 
 export class GameManager {

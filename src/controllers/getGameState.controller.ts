@@ -1,5 +1,4 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { gameManager } from "@services/game.manager.js";
 
 const getGameState = (request: FastifyRequest, reply: FastifyReply) => {
 	// const { roomId } = request.params as { roomId: string };

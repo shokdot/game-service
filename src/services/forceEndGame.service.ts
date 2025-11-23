@@ -1,4 +1,4 @@
-import { gameManager } from "./game.manager.js";
+import { gameManager } from "../game/GameManager.js";
 
 
 const forceEndGame = (roomId: string) => {

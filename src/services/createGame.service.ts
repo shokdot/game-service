@@ -1,4 +1,4 @@
-import { gameManager } from "@services/game.manager.js";
+import { gameManager } from "src/game/GameManager.js";
 
 const createGame = (roomId: string) => {
 	if (!roomId) {

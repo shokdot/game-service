@@ -1,14 +1,14 @@
-import { GameState } from "src/types/game.js";
-
-// Game constants
-export const GAME_WIDTH = 800;
-export const GAME_HEIGHT = 600;
-export const PADDLE_HEIGHT = 100;
-export const PADDLE_WIDTH = 10;
-export const BALL_SIZE = 10;
-export const BALL_SPEED = 5;
-export const PADDLE_SPEED = 8;
-export const TICK_RATE = 1000 / 60;
+import { GameState } from "src/game/types.js";
+import {
+	GAME_WIDTH,
+	GAME_HEIGHT,
+	PADDLE_HEIGHT,
+	PADDLE_WIDTH,
+	BALL_SIZE,
+	BALL_SPEED,
+	PADDLE_SPEED,
+	TICK_RATE
+} from './constants.js'
 
 export class GameInstance {
 	private state: GameState;

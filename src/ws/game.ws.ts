@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 import { FastifyRequest } from "fastify";
-import { gameManager } from "@services/game.manager.js";
+import { gameManager } from "src/game/GameManager.js";
 import authenticateWs from '@core/utils/authenticate.ws.js'
 
 const wsHandler = (conn: WebSocket, request: FastifyRequest) => {

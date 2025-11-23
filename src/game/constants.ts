@@ -1,0 +1,8 @@
+export const GAME_WIDTH = 800;
+export const GAME_HEIGHT = 600;
+export const PADDLE_HEIGHT = 100;
+export const PADDLE_WIDTH = 10;
+export const BALL_SIZE = 10;
+export const BALL_SPEED = 5;
+export const PADDLE_SPEED = 8;
+export const TICK_RATE = 1000 / 60;
