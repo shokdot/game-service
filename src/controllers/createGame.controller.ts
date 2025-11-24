@@ -1,13 +1,13 @@
-import createGame from "@services/createGame.service.js";
+import { createGame } from "@services/index.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 
 const createGameHandler = async (request: FastifyRequest, reply: FastifyReply) => {
 	try {
-		const { roomId } = request.body as { roomId: string };
+		const { roomId } = request.body as { roomId: string }; // refactor
 
 		createGame(roomId);
 
-		reply.send({
+		reply.send({ // refactor it
 			success: true,
 			message: `Game created for room: ${roomId}`,
 			roomId: roomId,

@@ -4,27 +4,36 @@ import { gameManager } from "src/game/GameManager.js";
 import authenticateWs from '@core/utils/authenticate.ws.js'
 
 const wsHandler = (conn: WebSocket, request: FastifyRequest) => {
-	// const authResult = authenticateWs(request.headers['authorization'], conn);
+	try {
+		const authResult = authenticateWs(request.headers['authorization'], conn);
 
-	// if (authResult) return;
+		const { userId } = authResult;
 
-	// const { token } = authResult;
+		const { roomId } = request.params as { roomId: string };
+		const game = gameManager.getGame(roomId);
 
-	const { roomId } = request.params as { roomId: string };
-	const game = gameManager.getGame(roomId);
-	// console.log(gameManager.listGames());
-	if (!game)
-		conn.close();
+		if (!game)
+			conn.close();
 
-	if (!gameManager.addPlayer(roomId, conn))
-		conn.close();
+		if (!gameManager.addPlayer(roomId, conn)) // save userId // per time interval one game user can participate
+			conn.close();
 
-	console.log(game);
-
-	conn.on('close', () => {
-		gameManager.removePlayer(roomId, conn);
-	});
-
+		conn.on('close', () => {
+			gameManager.removePlayer(roomId, conn);
+		});
+	}
+	catch (error) {
+		switch (error.code) {
+			case 'ACCESS_TOKEN_MISSING':
+				conn.close(1008, 'ACCESS_TOKEN_MISSING');
+				break;
+			case 'INVALID_ACCESS_TOKEN':
+				conn.close(1008, 'INVALID_ACCESS_TOKEN');
+				break;
+			default:
+				conn.close(1011, 'INTERNAL_SERVER_ERROR');
+		}
+	}
 };
 
 export default wsHandler;

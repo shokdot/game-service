@@ -1,10 +1,10 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import forceEndGame from "@services/forceEndGame.service.js";
+import { forceEndGame } from "@services/index.js";
 
 const forceEndGameHandler = (request: FastifyRequest, reply: FastifyReply) => {
 	try {
 
-		const { roomId } = request.params as { roomId: string };
+		const { roomId } = request.params as { roomId: string }; // ref
 
 		forceEndGame(roomId);
 
