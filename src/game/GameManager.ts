@@ -1,10 +1,11 @@
 import { GameInstance } from 'src/game/GameInstance.js';
 import { WebSocket } from "ws";
+import { Player } from './types.js'
 
 export class GameManager {
 	private games = new Map<string, {
 		instance: GameInstance,
-		players: Set<WebSocket> // WS clients
+		players: Set<Player> // WS clients
 	}>();
 
 	/** Create and register a new game instance for a room */
@@ -40,17 +41,30 @@ export class GameManager {
 		const json = JSON.stringify(data);
 
 		for (const player of game.players) {
-			if (player.readyState === WebSocket.OPEN) {
-				player.send(json);
+			if (player.socket.readyState === WebSocket.OPEN) {
+				player.socket.send(json);
 			}
 		}
 	}
 
-	public addPlayer(roomId: string, player: WebSocket): boolean {
+	public addPlayer(roomId: string, userId: string, socket: WebSocket): boolean {
+		// decide player 1 or 2
 		const game = this.getGame(roomId);
 		if (!game) return false;
 
 		if (game.players.size >= 2) return false;
+
+		for (const p of game.players) {
+			if (p.userId === userId) return false;
+		}
+
+		const playerNumber = game.players.size === 0 ? 1 : 2;
+
+		const player: Player = {
+			userId,
+			socket,
+			playerNumber
+		};
 
 		game.players.add(player);
 
@@ -61,13 +75,24 @@ export class GameManager {
 		return true;
 	}
 
-	public removePlayer(roomId: string, player: WebSocket) {
+	public removePlayer(roomId: string, socket: WebSocket) {
 		const game = this.getGame(roomId);
 		if (!game) return false;
 
-		game.players.delete(player);
+		let removedPlayer: Player | null = null;
 
-		try { player.close(); } catch { }
+		for (const p of game.players) {
+			if (p.socket === socket) {
+				removedPlayer = p;
+				break;
+			}
+		}
+
+		if (!removedPlayer) return false;
+
+		game.players.delete(removedPlayer);
+
+		try { socket.close(); } catch { }
 
 		if (game.players.size < 2 && game.instance.isRunning()) {
 			game.instance.stop();
@@ -79,8 +104,8 @@ export class GameManager {
 		}
 
 		for (const p of game.players) {
-			if (p.readyState === WebSocket.OPEN) {
-				p.send(JSON.stringify({ type: "opponent_left" }));
+			if (p.socket.readyState === WebSocket.OPEN) {
+				p.socket.send(JSON.stringify({ type: "opponent_left" }));
 			}
 		}
 
@@ -98,10 +123,10 @@ export class GameManager {
 
 		for (const player of game.players) {
 			try {
-				if (player.readyState === WebSocket.OPEN) {
-					player.send(JSON.stringify({ type: "game_end" }));
+				if (player.socket.readyState === WebSocket.OPEN) {
+					player.socket.send(JSON.stringify({ type: "game_end" }));
 				}
-				player.close();
+				player.socket.close();
 			} catch { }
 		}
 

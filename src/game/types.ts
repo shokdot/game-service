@@ -1,3 +1,5 @@
+import WebSocket from "ws";
+
 export interface Ball {
 	x: number;
 	y: number;
@@ -21,3 +23,9 @@ export interface GameState {
 	paddle2: Paddle;
 	score: Score;
 }
+
+export type Player = {
+	userId: string;
+	socket: WebSocket;
+	playerNumber: 1 | 2;
+};
