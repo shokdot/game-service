@@ -5,10 +5,9 @@ import { Player } from './types.js'
 export class GameManager {
 	private games = new Map<string, {
 		instance: GameInstance,
-		players: Set<Player> // WS clients
+		players: Set<Player>
 	}>();
 
-	/** Create and register a new game instance for a room */
 	public createGame(roomId: string) {
 		if (this.games.has(roomId)) {
 			throw new Error(`Game already exists for room: ${roomId}`);
@@ -29,7 +28,6 @@ export class GameManager {
 		return this.games.get(roomId);
 	}
 
-	/** Get a running game instance by roomId */
 	public getGame(roomId: string) {
 		return this.games.get(roomId);
 	}
@@ -48,7 +46,6 @@ export class GameManager {
 	}
 
 	public addPlayer(roomId: string, userId: string, socket: WebSocket): boolean {
-		// decide player 1 or 2
 		const game = this.getGame(roomId);
 		if (!game) return false;
 
@@ -130,12 +127,13 @@ export class GameManager {
 			} catch { }
 		}
 
-		// Remove the game from manager
 		this.games.delete(roomId);
 
 		return true;
 
 	}
+
+	// TODO: turning off handler for clean
 
 	// /** Return all active games (for debugging/admin) */
 	listGames(): string[] {
