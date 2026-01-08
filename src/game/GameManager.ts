@@ -3,152 +3,158 @@ import { WebSocket } from "ws";
 import { Player } from './types.js'
 
 export class GameManager {
-	private games = new Map<string, {
-		instance: GameInstance,
-		players: Set<Player>
-	}>();
+    private games = new Map<string, {
+        instance: GameInstance,
+        players: Set<Player>
+    }>();
 
-	public createGame(roomId: string) {
-		if (this.games.has(roomId)) {
-			throw new Error(`Game already exists for room: ${roomId}`);
-		}
+    public createGame(roomId: string) {
+        if (this.games.has(roomId)) {
+            throw new Error(`Game already exists for room: ${roomId}`);
+        }
 
-		const instance = new GameInstance((state) => {
-			this.broadcast(roomId, {
-				type: "state",
-				state
-			});
-		});
+        const instance = new GameInstance((state) => {
+            this.broadcast(roomId, {
+                type: "state",
+                state
+            });
+        });
 
-		this.games.set(roomId, {
-			instance,
-			players: new Set()
-		});
+        this.games.set(roomId, {
+            instance,
+            players: new Set()
+        });
 
-		return this.games.get(roomId);
-	}
+        return this.games.get(roomId);
+    }
 
-	public getGame(roomId: string) {
-		return this.games.get(roomId);
-	}
+    public getGame(roomId: string) {
+        return this.games.get(roomId);
+    }
 
-	private broadcast(roomId: string, data: any) {
-		const game = this.getGame(roomId);
-		if (!game) return;
+    private broadcast(roomId: string, data: any) {
+        const game = this.getGame(roomId);
+        if (!game) return;
 
-		const json = JSON.stringify(data);
+        const json = JSON.stringify(data);
 
-		for (const player of game.players) {
-			if (player.socket.readyState === WebSocket.OPEN) {
-				player.socket.send(json);
-			}
-		}
-	}
+        for (const player of game.players) {
+            if (player.socket.readyState === WebSocket.OPEN) {
+                player.socket.send(json);
+            }
+        }
+    }
 
-	public addPlayer(roomId: string, userId: string, socket: WebSocket): boolean {
-		const game = this.getGame(roomId);
-		if (!game) return false;
+    public addPlayer(roomId: string, userId: string, socket: WebSocket): boolean {
+        const game = this.getGame(roomId);
+        if (!game) return false;
 
-		if (game.players.size >= 2) return false;
+        if (game.players.size >= 2) return false;
 
-		for (const p of game.players) {
-			if (p.userId === userId) return false;
-		}
+        for (const p of game.players) {
+            if (p.userId === userId) return false;
+        }
 
-		const playerNumber = game.players.size === 0 ? 1 : 2;
+        const playerNumber = game.players.size === 0 ? 1 : 2;
 
-		const player: Player = {
-			userId,
-			socket,
-			playerNumber
-		};
+        const player: Player = {
+            userId,
+            socket,
+            playerNumber
+        };
 
-		game.players.add(player);
+        game.players.add(player);
 
-		if (game.players.size === 2 && !game.instance.isRunning()) {
-			game.instance.start();
-		}
+        if (game.players.size === 2 && !game.instance.isRunning()) {
+            game.instance.start();
+        }
 
-		return true;
-	}
+        return true;
+    }
 
-	public removePlayer(roomId: string, socket: WebSocket) {
-		const game = this.getGame(roomId);
-		if (!game) return false;
+    public removePlayer(roomId: string, socket: WebSocket) {
+        const game = this.getGame(roomId);
+        if (!game) return false;
 
-		let removedPlayer: Player | null = null;
+        let removedPlayer: Player | null = null;
 
-		for (const p of game.players) {
-			if (p.socket === socket) {
-				removedPlayer = p;
-				break;
-			}
-		}
+        for (const p of game.players) {
+            if (p.socket === socket) {
+                removedPlayer = p;
+                break;
+            }
+        }
 
-		if (!removedPlayer) return false;
+        if (!removedPlayer) return false;
 
-		game.players.delete(removedPlayer);
+        game.players.delete(removedPlayer);
 
-		try { socket.close(); } catch { }
+        try { socket.close(); } catch { }
 
-		if (game.players.size < 2 && game.instance.isRunning()) {
-			game.instance.stop();
-		}
+        if (game.players.size < 2 && game.instance.isRunning()) {
+            game.instance.stop();
+        }
 
-		if (game.players.size === 0) {
-			this.games.delete(roomId);
-			return true;
-		}
+        if (game.players.size === 0) {
+            this.games.delete(roomId);
+            return true;
+        }
 
-		for (const p of game.players) {
-			if (p.socket.readyState === WebSocket.OPEN) {
-				p.socket.send(JSON.stringify({ type: "opponent_left" }));
-			}
-		}
+        for (const p of game.players) {
+            if (p.socket.readyState === WebSocket.OPEN) {
+                p.socket.send(JSON.stringify({ type: "opponent_left" }));
+            }
+        }
 
-		return true;
-	}
+        return true;
+    }
 
-	public endGame(roomId: string): boolean {
+    public endGame(roomId: string): boolean {
 
-		const game = this.getGame(roomId);
-		if (!game) return false;
+        const game = this.getGame(roomId);
+        if (!game) return false;
 
-		if (game.instance.isRunning()) {
-			game.instance.stop();
-		}
+        if (game.instance.isRunning()) {
+            game.instance.stop();
+        }
 
-		for (const player of game.players) {
-			try {
-				if (player.socket.readyState === WebSocket.OPEN) {
-					player.socket.send(JSON.stringify({ type: "game_end" }));
-				}
-				player.socket.close();
-			} catch { }
-		}
+        for (const player of game.players) {
+            try {
+                if (player.socket.readyState === WebSocket.OPEN) {
+                    player.socket.send(JSON.stringify({ type: "game_end" }));
+                }
+                player.socket.close();
+            } catch { }
+        }
 
-		this.games.delete(roomId);
+        this.games.delete(roomId);
 
-		return true;
+        return true;
 
-	}
+    }
 
-	// TODO: turning off handler for clean
+    public listGames(): string[] {
+        return Array.from(this.games.keys());
+    }
 
-	// /** Return all active games (for debugging/admin) */
-	listGames(): string[] {
-		return Array.from(this.games.keys());
-	}
+    public forceCleanup() {
+        for (const [roomId, game] of this.games) {
+            try {
+                if (game.instance.isRunning()) {
+                    game.instance.stop();
+                }
 
-	/** Clear all games — use only in shutdown or tests */
-	// clearAll(): void {
-	// 	for (const [roomId, game] of this.games) {
-	// 		game.stop?.();
-	// 		this.games.delete(roomId);
-	// 	}
-	// 	console.log(`[GameManager] All games cleared`);
-	// }
+                for (const player of game.players) {
+                    try {
+                        player.socket.close();
+                    } catch { }
+                }
+            } catch (error) {
+                console.error(`[GameManager] Error in force cleanup for ${roomId}:`, error);
+            }
+        }
+        this.games.clear();
+    }
 }
 
-/** Singleton instance (used across controllers/services) */
 export const gameManager = new GameManager();
