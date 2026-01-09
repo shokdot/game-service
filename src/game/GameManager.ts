@@ -8,17 +8,21 @@ export class GameManager {
         players: Set<Player>
     }>();
 
-    public createGame(roomId: string) {
+    public createGame(roomId: string, winScore?: number) {
         if (this.games.has(roomId)) {
             throw new Error(`Game already exists for room: ${roomId}`);
         }
 
-        const instance = new GameInstance((state) => {
-            this.broadcast(roomId, {
-                type: "state",
-                state
-            });
-        });
+        const instance = new GameInstance(
+            (state) => {
+                this.broadcast(roomId, { type: "state", state });
+            },
+            (winner) => {
+                this.broadcast(roomId, { type: "game_end", winner });
+                this.endGame(roomId);
+            },
+            winScore
+        );
 
         this.games.set(roomId, {
             instance,
@@ -130,31 +134,28 @@ export class GameManager {
         this.games.delete(roomId);
 
         return true;
-
     }
 
     public listGames(): string[] {
         return Array.from(this.games.keys());
     }
 
-    public forceCleanup() {
-        for (const [roomId, game] of this.games) {
-            try {
+    public forceCleanup(): void {
+        try {
+            for (const [, game] of this.games) {
                 if (game.instance.isRunning()) {
                     game.instance.stop();
                 }
-
                 for (const player of game.players) {
                     try {
-                        player.socket.close();
+                        player.socket.close(1001, 'Server shutting down');
                     } catch { }
                 }
-            } catch (error) {
-                console.error(`[GameManager] Error in force cleanup for ${roomId}:`, error);
             }
-        }
-        this.games.clear();
+            this.games.clear();
+        } catch { }
     }
+
 }
 
 export const gameManager = new GameManager();

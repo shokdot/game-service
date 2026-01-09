@@ -1,13 +1,13 @@
 import { sendError } from "@core/index.js";
 import { createGame } from "@services/index.js";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { roomByIdDTO } from "src/dto/room-by-id.dto.js";
+import { CreateGameDTO } from "src/dto/create-game.dto.js";
 
-const createGameHandler = async (request: FastifyRequest<{ Body: roomByIdDTO }>, reply: FastifyReply) => {
+const createGameHandler = async (request: FastifyRequest<{ Body: CreateGameDTO }>, reply: FastifyReply) => {
 	try {
-		const { roomId } = request.body;
+		const { roomId, winScore } = request.body;
 
-		createGame(roomId);
+		createGame(roomId, winScore);
 
 		return reply.status(200).send({
 			status: 'success',

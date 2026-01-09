@@ -5,9 +5,11 @@ import wsHandler from "src/ws/game.ws.js";
 import { FastifyInstance } from "fastify";
 import serviceAuth from "@core/middlewares/serviceAuth.middleware.js"
 
+//schemas
+
 export default async function gameRoutes(app: FastifyInstance) {
-	app.post('/', { preHandler: serviceAuth }, createGameHandler);
-	app.get('/ws/:roomId', { websocket: true }, wsHandler);
-	app.get('/:roomId', { preHandler: serviceAuth }, getGameState);
-	app.delete('/:roomId', { preHandler: serviceAuth }, forceEndGameHandler);
+    app.post('/', { preHandler: serviceAuth }, createGameHandler);
+    app.get('/ws/:roomId', { websocket: true }, wsHandler);
+    app.get('/:roomId', { preHandler: serviceAuth }, getGameState);
+    app.delete('/:roomId', { preHandler: serviceAuth }, forceEndGameHandler);
 };
