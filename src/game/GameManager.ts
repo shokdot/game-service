@@ -18,7 +18,15 @@ export class GameManager {
                 this.broadcast(roomId, { type: "state", state });
             },
             (winner) => {
-                this.broadcast(roomId, { type: "game_end", winner });
+                const game = this.getGame(roomId);
+                if (game) {
+                    for (const player of game.players) {
+                        if (player.socket.readyState === WebSocket.OPEN) {
+                            const type = player.playerNumber === winner ? "you_win" : "you_lose";
+                            player.socket.send(JSON.stringify({ type }));
+                        }
+                    }
+                }
                 this.endGame(roomId);
             },
             winScore
