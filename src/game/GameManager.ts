@@ -1,7 +1,7 @@
 import { GameInstance } from 'src/game/GameInstance.js';
 import { WebSocket } from "ws";
 import { Player } from './types.js'
-import { SERVICE_TOKEN, ROOM_SERVICE_URL } from 'src/utils/env.js';
+import { SERVICE_TOKEN, ROOM_SERVICE_URL, USER_SERVICE_URL } from 'src/utils/env.js';
 import axios from 'axios';
 
 export class GameManager {
@@ -81,6 +81,10 @@ export class GameManager {
 
         if (game.players.size === 2 && !game.instance.isRunning()) {
             game.instance.start();
+            // Update status for both players
+            for (const p of game.players) {
+                this.updateUserStatus(p.userId, 'IN_GAME').catch(console.error);
+            }
         }
 
         return true;
@@ -106,6 +110,7 @@ export class GameManager {
         try { socket.close(); } catch { }
 
         this.notifyRoomService(roomId, removedPlayer.userId, 'leave');
+        this.updateUserStatus(removedPlayer.userId, 'ONLINE').catch(console.error);
 
         if (game.players.size < 2 && game.instance.isRunning()) {
             game.instance.stop();
@@ -148,6 +153,10 @@ export class GameManager {
         // Need notify winner & score
         this.notifyRoomService(roomId, '', 'finish');
 
+        for (const player of game.players) {
+            this.updateUserStatus(player.userId, 'ONLINE').catch(console.error);
+        }
+
         return true;
     }
 
@@ -171,6 +180,22 @@ export class GameManager {
 
         } catch (error) {
             console.error(error);
+        }
+    }
+
+    private async updateUserStatus(userId: string, status: 'ONLINE' | 'OFFLINE' | 'IN_GAME') {
+        try {
+            const url = `${USER_SERVICE_URL}/${userId}/status`;
+            await axios.patch(url, {
+                status
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-service-token': SERVICE_TOKEN
+                }
+            });
+        } catch (error) {
+            console.error(`Failed to update status for user ${userId}:`, error);
         }
     }
 
