@@ -214,8 +214,8 @@ export class GameManager {
         try {
 
             const path = action === 'leave'
-                ? `${roomId}/leave-internal`
-                : `${roomId}/finish`;
+                ? `${roomId}/internal/leave`
+                : `${roomId}/internal/finish`;
 
             const url = `${ROOM_SERVICE_URL}/${path}`;
 
