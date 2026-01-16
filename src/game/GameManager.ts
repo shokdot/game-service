@@ -235,7 +235,8 @@ export class GameManager {
 
     private async updateUserStatus(userId: string, status: 'ONLINE' | 'OFFLINE' | 'IN_GAME') {
         try {
-            const url = `${USER_SERVICE_URL}/${userId}/status`;
+            const url = `${USER_SERVICE_URL}/internal/${userId}/status`;
+
             await axios.patch(url, {
                 status
             }, {
