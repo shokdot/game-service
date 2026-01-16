@@ -63,18 +63,37 @@ export class GameManager {
         const game = this.getGame(roomId);
         if (!game) return false;
 
-        if (game.players.size >= 2) return false;
-
+        // Check if player is reconnecting
         for (const p of game.players) {
-            if (p.userId === userId) return false;
+            if (p.userId === userId) {
+                if (p.reconnectTimer) {
+                    clearTimeout(p.reconnectTimer);
+                    p.reconnectTimer = undefined;
+                }
+                p.socket = socket;
+                p.isConnected = true;
+
+                // Notify player of current state
+                socket.send(JSON.stringify({ type: "reconnected", state: game.instance.getState() }));
+
+                // Resume game if both are connected
+                if ([...game.players].every(player => player.isConnected) && !game.instance.isRunning()) {
+                    game.instance.start();
+                    this.broadcast(roomId, { type: "game_resumed" });
+                }
+                return true;
+            }
         }
+
+        if (game.players.size >= 2) return false;
 
         const playerNumber = game.players.size === 0 ? 1 : 2;
 
         const player: Player = {
             userId,
             socket,
-            playerNumber
+            playerNumber,
+            isConnected: true
         };
 
         game.players.add(player);
@@ -90,7 +109,36 @@ export class GameManager {
         return true;
     }
 
-    public removePlayer(roomId: string, socket: WebSocket) {
+    public handleDisconnect(roomId: string, socket: WebSocket) {
+        const game = this.getGame(roomId);
+        if (!game) return;
+
+        let disconnectedPlayer: Player | null = null;
+        for (const p of game.players) {
+            if (p.socket === socket) {
+                disconnectedPlayer = p;
+                break;
+            }
+        }
+
+        if (!disconnectedPlayer || !disconnectedPlayer.isConnected) return;
+
+        disconnectedPlayer.isConnected = false;
+
+        // Pause game
+        if (game.instance.isRunning()) {
+            game.instance.stop();
+        }
+
+        this.broadcast(roomId, { type: "opponent_disconnected", userId: disconnectedPlayer.userId });
+
+        // Start reconnection timer
+        disconnectedPlayer.reconnectTimer = setTimeout(() => {
+            this.removePlayer(roomId, socket, true);
+        }, 30000); // 30 seconds
+    }
+
+    public removePlayer(roomId: string, socket: WebSocket, isTimeout = false) {
         const game = this.getGame(roomId);
         if (!game) return false;
 
@@ -105,6 +153,10 @@ export class GameManager {
 
         if (!removedPlayer) return false;
 
+        if (removedPlayer.reconnectTimer && !isTimeout) {
+            clearTimeout(removedPlayer.reconnectTimer);
+        }
+
         game.players.delete(removedPlayer);
 
         try { socket.close(); } catch { }
@@ -112,20 +164,18 @@ export class GameManager {
         this.notifyRoomService(roomId, removedPlayer.userId, 'leave');
         this.updateUserStatus(removedPlayer.userId, 'ONLINE').catch(console.error);
 
-        if (game.players.size < 2 && game.instance.isRunning()) {
-            game.instance.stop();
-        }
-
         if (game.players.size === 0) {
             this.games.delete(roomId);
             return true;
         }
 
-        for (const p of game.players) {
-            if (p.socket.readyState === WebSocket.OPEN) {
-                p.socket.send(JSON.stringify({ type: "opponent_left" }));
-            }
+        // If one remains, declare them winner or end game since other didn't return
+        const winner = [...game.players][0];
+        if (winner && winner.socket.readyState === WebSocket.OPEN) {
+            winner.socket.send(JSON.stringify({ type: "opponent_left_permanently" }));
         }
+
+        this.endGame(roomId);
 
         return true;
     }

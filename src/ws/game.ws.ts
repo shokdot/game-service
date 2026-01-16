@@ -39,7 +39,7 @@ const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
         });
 
         ws.on('close', () => {
-            gameManager.removePlayer(roomId, ws);
+            gameManager.handleDisconnect(roomId, ws);
         });
     }
     catch (error) {

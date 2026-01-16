@@ -28,4 +28,6 @@ export type Player = {
 	userId: string;
 	socket: WebSocket;
 	playerNumber: 1 | 2;
+	isConnected: boolean;
+	reconnectTimer?: NodeJS.Timeout;
 };
