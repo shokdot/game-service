@@ -19,12 +19,7 @@ const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
             return;
         }
 
-        const playerNumber = gameManager.addPlayer(roomId, userId, ws);
-
-        if (!playerNumber) {
-            ws.close(4003, 'Room is full');
-            return;
-        }
+        gameManager.addPlayer(roomId, userId, ws);
 
         ws.on('message', (msg) => {
             try {
@@ -49,6 +44,12 @@ const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
                 break;
             case 'INVALID_ACCESS_TOKEN':
                 ws.close(1008, 'INVALID_ACCESS_TOKEN');
+                break;
+            case 'USER_NOT_ALLOWED':
+                ws.close(4003, 'User not allowed in this game');
+                break;
+            case 'ROOM_FULL':
+                ws.close(4003, 'Room is full');
                 break;
             default:
                 ws.close(1011, 'INTERNAL_SERVER_ERROR');

@@ -5,9 +5,9 @@ import { CreateGameDTO } from "src/dto/create-game.dto.js";
 
 const createGameHandler = async (request: FastifyRequest<{ Body: CreateGameDTO }>, reply: FastifyReply) => {
 	try {
-		const { roomId, winScore } = request.body;
+		const { roomId, userIds, winScore } = request.body;
 
-		createGame(roomId, winScore);
+		createGame(roomId, userIds, winScore);
 
 		return reply.status(200).send({
 			status: 'success',

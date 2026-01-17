@@ -3,14 +3,16 @@ import { WebSocket } from "ws";
 import { Player } from './types.js'
 import { SERVICE_TOKEN, ROOM_SERVICE_URL, USER_SERVICE_URL } from 'src/utils/env.js';
 import axios from 'axios';
+import { AppError } from '@core/utils/AppError.js';
 
 export class GameManager {
     private games = new Map<string, {
         instance: GameInstance,
-        players: Set<Player>
+        players: Set<Player>,
+        allowedUserIds: Set<string>
     }>();
 
-    public createGame(roomId: string, winScore?: number) {
+    public createGame(roomId: string, userIds: string[], winScore?: number) {
         if (this.games.has(roomId)) {
             throw new Error(`Game already exists for room: ${roomId}`);
         }
@@ -36,7 +38,8 @@ export class GameManager {
 
         this.games.set(roomId, {
             instance,
-            players: new Set()
+            players: new Set(),
+            allowedUserIds: new Set(userIds)
         });
 
         return this.games.get(roomId);
@@ -63,6 +66,10 @@ export class GameManager {
         const game = this.getGame(roomId);
         if (!game) return false;
 
+        if (!game.allowedUserIds.has(userId)) {
+            throw new AppError('USER_NOT_ALLOWED');
+        }
+
         // Check if player is reconnecting
         for (const p of game.players) {
             if (p.userId === userId) {
@@ -85,7 +92,9 @@ export class GameManager {
             }
         }
 
-        if (game.players.size >= 2) return false;
+        if (game.players.size >= 2) {
+            throw new AppError('ROOM_FULL');
+        }
 
         const playerNumber = game.players.size === 0 ? 1 : 2;
 
