@@ -1,6 +1,6 @@
 import { GameInstance } from 'src/game/GameInstance.js';
 import { WebSocket } from "ws";
-import { Player } from './types.js'
+import { GameResult, Player } from './types.js'
 import { SERVICE_TOKEN, ROOM_SERVICE_URL, USER_SERVICE_URL } from 'src/utils/env.js';
 import axios from 'axios';
 import { AppError } from '@core/utils/AppError.js';
@@ -21,17 +21,20 @@ export class GameManager {
             (state) => {
                 this.broadcast(roomId, { type: "state", state });
             },
-            (winner) => {
+            (result) => {
                 const game = this.getGame(roomId);
                 if (game) {
                     for (const player of game.players) {
                         if (player.socket.readyState === WebSocket.OPEN) {
-                            const type = player.playerNumber === winner ? "you_win" : "you_lose";
-                            player.socket.send(JSON.stringify({ type }));
+                            const type = player.playerNumber === result.winner ? "you_win" : "you_lose";
+                            player.socket.send(JSON.stringify({
+                                type,
+                                result
+                            }));
                         }
                     }
                 }
-                this.endGame(roomId);
+                this.endGame(roomId, result);
             },
             winScore
         );
@@ -170,7 +173,7 @@ export class GameManager {
 
         try { socket.close(); } catch { }
 
-        this.notifyRoomService(roomId, removedPlayer.userId, 'leave');
+        this.notifyRoomServiceLeave(roomId, removedPlayer.userId);
         this.updateUserStatus(removedPlayer.userId, 'ONLINE').catch(console.error);
 
         if (game.players.size === 0) {
@@ -189,7 +192,7 @@ export class GameManager {
         return true;
     }
 
-    public endGame(roomId: string): boolean {
+    public endGame(roomId: string, result?: GameResult): boolean {
 
         const game = this.getGame(roomId);
         if (!game) return false;
@@ -209,8 +212,7 @@ export class GameManager {
 
         this.games.delete(roomId);
 
-        // Need notify winner & score
-        this.notifyRoomService(roomId, '', 'finish');
+        this.notifyRoomServiceFinish(roomId, result);
 
         for (const player of game.players) {
             this.updateUserStatus(player.userId, 'ONLINE').catch(console.error);
@@ -219,14 +221,9 @@ export class GameManager {
         return true;
     }
 
-    private async notifyRoomService(roomId: string, userId: string, action: 'leave' | 'finish') {
+    private async notifyRoomServiceLeave(roomId: string, userId: string) {
         try {
-
-            const path = action === 'leave'
-                ? `${roomId}/internal/leave`
-                : `${roomId}/internal/finish`;
-
-            const url = `${ROOM_SERVICE_URL}/${path}`;
+            const url = `${ROOM_SERVICE_URL}/${roomId}/internal/leave`;
 
             await axios.post(url, {
                 userId
@@ -238,7 +235,36 @@ export class GameManager {
             });
 
         } catch (error) {
-            console.error(error);
+            console.error('Failed to notify room service (leave):', error);
+        }
+    }
+
+    private async notifyRoomServiceFinish(roomId: string, result?: GameResult) {
+        try {
+            const url = `${ROOM_SERVICE_URL}/${roomId}/internal/finish`;
+
+            const game = this.getGame(roomId);
+            const players = game ? Array.from(game.players) : [];
+
+            await axios.post(url, {
+                winner: result?.winner,
+                finalScore: result?.finalScore,
+                gameDuration: result?.gameDuration,
+                startTime: result?.startTime,
+                endTime: result?.endTime,
+                players: players.map(p => ({
+                    userId: p.userId,
+                    playerNumber: p.playerNumber
+                }))
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-service-token': SERVICE_TOKEN
+                }
+            });
+
+        } catch (error) {
+            console.error('Failed to notify room service (finish):', error);
         }
     }
 

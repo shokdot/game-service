@@ -1,4 +1,3 @@
-import { GameState } from "src/game/types.js";
 import {
     GAME_WIDTH,
     GAME_HEIGHT,
@@ -10,16 +9,22 @@ import {
     TICK_RATE,
     WIN_SCORE
 } from './constants.js'
+import { GameResult, GameState } from "src/game/types.js";
 
 export class GameInstance {
     private state: GameState;
     private running = false;
     private interval: NodeJS.Timeout | null = null;
     private onUpdate?: (state: GameState) => void;
-    private onGameEnd?: (winner: 1 | 2) => void;
+    private onGameEnd?: (result: GameResult) => void;
     private winScore: number;
+    private startTime?: Date;
 
-    constructor(onUpdate?: (state: GameState) => void, onGameEnd?: (winner: 1 | 2) => void, winScore: number = WIN_SCORE) {
+    constructor(
+        onUpdate?: (state: GameState) => void,
+        onGameEnd?: (result: GameResult) => void,
+        winScore: number = WIN_SCORE
+    ) {
         this.state = this.createInitialState();
         this.onUpdate = onUpdate;
         this.onGameEnd = onGameEnd;
@@ -43,6 +48,7 @@ export class GameInstance {
     public start(): void {
         if (this.running) return;
         this.running = true;
+        this.startTime = new Date();
 
         this.interval = setInterval(() => {
             this.update();
@@ -116,16 +122,16 @@ export class GameInstance {
             score.player2++;
             if (score.player2 >= this.winScore) {
                 this.stop();
-                if (this.onGameEnd) this.onGameEnd(2);
+                this.triggerGameEnd(2);
                 return;
             }
             this.resetBall();
-        } else if (ball.x > GAME_WIDTH) {
+        }
+        else if (ball.x > GAME_WIDTH) {
             score.player1++;
             if (score.player1 >= this.winScore) {
                 this.stop();
-                if (this.onGameEnd) this.onGameEnd(1);
-                return;
+                this.triggerGameEnd(1);
             }
             this.resetBall();
         }
@@ -150,5 +156,23 @@ export class GameInstance {
 
     private randomDirection(): number {
         return Math.random() > 0.5 ? 1 : -1;
+    }
+
+    private triggerGameEnd(winner: 1 | 2): void {
+        if (!this.onGameEnd || !this.startTime) return;
+
+        const endTime = new Date();
+        const result: GameResult = {
+            winner,
+            finalScore: {
+                player1: this.state.score.player1,
+                player2: this.state.score.player2
+            },
+            gameDuration: endTime.getTime() - this.startTime.getTime(),
+            startTime: this.startTime,
+            endTime
+        };
+
+        this.onGameEnd(result);
     }
 }

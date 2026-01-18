@@ -31,3 +31,14 @@ export type Player = {
 	isConnected: boolean;
 	reconnectTimer?: NodeJS.Timeout;
 };
+
+export interface GameResult {
+	winner: 1 | 2;
+	finalScore: {
+		player1: number;
+		player2: number;
+	};
+	gameDuration: number; // in milliseconds
+	startTime: Date;
+	endTime: Date;
+}
