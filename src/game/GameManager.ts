@@ -93,8 +93,8 @@ export class GameManager {
                 // Notify player of current state
                 socket.send(JSON.stringify({ type: "reconnected", state: game.instance.getState() }));
 
-                // Resume game if both are connected
-                if ([...game.players].every(player => player.isConnected) && !game.instance.isRunning()) {
+                // Resume game if both are connected and there are exactly 2 players
+                if (game.players.size === 2 && [...game.players].every(player => player.isConnected) && !game.instance.isRunning()) {
                     game.instance.start();
                     this.broadcast(roomId, { type: "game_resumed" });
                 }
@@ -209,6 +209,10 @@ export class GameManager {
         }
 
         for (const player of game.players) {
+            if (player.reconnectTimer) {
+                clearTimeout(player.reconnectTimer);
+                player.reconnectTimer = undefined;
+            }
             try {
                 if (player.socket.readyState === WebSocket.OPEN) {
                     player.socket.send(JSON.stringify({ type: "game_end" }));
@@ -217,9 +221,10 @@ export class GameManager {
             } catch { }
         }
 
+        const players = Array.from(game.players);
         this.games.delete(roomId);
 
-        this.notifyRoomServiceFinish(roomId, result);
+        this.notifyRoomServiceFinish(roomId, players, result);
 
         for (const player of game.players) {
             this.updateUserStatus(player.userId, 'ONLINE').catch(console.error);
@@ -246,12 +251,9 @@ export class GameManager {
         }
     }
 
-    private async notifyRoomServiceFinish(roomId: string, result?: GameResult) {
+    private async notifyRoomServiceFinish(roomId: string, players: Player[], result?: GameResult) {
         try {
             const url = `${ROOM_SERVICE_URL}/${roomId}/internal/finish`;
-
-            const game = this.getGame(roomId);
-            const players = game ? Array.from(game.players) : [];
 
             await axios.post(url, {
                 winner: result?.winner,

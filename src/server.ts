@@ -21,12 +21,16 @@ const heartbeatInterval = setInterval(() => {
         if (game) {
             game.players.forEach(player => {
                 const ws = player.socket as any;
-                if (ws.isAlive === false) {
+                if (player.socket.readyState === WebSocket.OPEN) {
+                    if (ws.isAlive === false) {
+                        player.socket.terminate();
+                        return;
+                    }
+                    ws.isAlive = false;
+                    player.socket.ping();
+                } else {
                     player.socket.terminate();
-                    return;
                 }
-                ws.isAlive = false;
-                player.socket.ping();
             });
         }
     });

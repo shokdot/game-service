@@ -104,7 +104,11 @@ export class GameInstance {
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        if (ball.y <= 0 || ball.y >= GAME_HEIGHT - BALL_SIZE) {
+        if (ball.y <= 0) {
+            ball.y = 0;
+            ball.vy *= -1;
+        } else if (ball.y >= GAME_HEIGHT - BALL_SIZE) {
+            ball.y = GAME_HEIGHT - BALL_SIZE;
             ball.vy *= -1;
         }
 
@@ -142,7 +146,9 @@ export class GameInstance {
     }
 
     private addRandomSpin(ball: { vy: number }) {
+        const MAX_BALL_VY = BALL_SPEED * 2;
         ball.vy += (Math.random() - 0.5) * 2;
+        ball.vy = Math.max(-MAX_BALL_VY, Math.min(MAX_BALL_VY, ball.vy));
     }
 
     private resetBall(): void {
