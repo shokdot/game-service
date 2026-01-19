@@ -14,6 +14,24 @@ app.addHook('onClose', async () => {
     await gameManager.forceCleanup();
 });
 
+const heartbeatInterval = setInterval(() => {
+    const games = gameManager.listGames();
+    games.forEach(roomId => {
+        const game = gameManager.getGame(roomId);
+        if (game) {
+            game.players.forEach(player => {
+                const ws = player.socket as any;
+                if (ws.isAlive === false) {
+                    player.socket.terminate();
+                    return;
+                }
+                ws.isAlive = false;
+                player.socket.ping();
+            });
+        }
+    });
+}, 30000);
+
 async function registerRoutes(app: FastifyInstance) {
     await app.register(healthRoutes, { prefix: `${API_PREFIX}/games` });
     await app.register(gameRoutes, { prefix: `${API_PREFIX}/games` });

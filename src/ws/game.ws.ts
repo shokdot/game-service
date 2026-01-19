@@ -5,10 +5,12 @@ import { roomByIdDTO } from "src/dto/room-by-id.dto.js";
 import { isValidWsInput } from "src/dto/ws-input.dto.js";
 import authenticateWs from '@core/utils/authenticate.ws.js'
 
-const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
+const wsHandler = (ws: WebSocket & { isAlive?: boolean }, request: FastifyRequest) => {
     try {
-        const authResult = authenticateWs(request.headers['authorization'], ws);
+        ws.isAlive = true;
+        ws.on('pong', () => { ws.isAlive = true; });
 
+        const authResult = authenticateWs(request.headers['authorization'], ws);
         const { userId } = authResult;
 
         const { roomId } = request.params as roomByIdDTO;
@@ -21,7 +23,14 @@ const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
 
         gameManager.addPlayer(roomId, userId, ws);
 
+        let lastMessageTime = 0;
+        const MIN_MESSAGE_INTERVAL = 50; // Max 20 messages per second
+
         ws.on('message', (msg) => {
+            const now = Date.now();
+            if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) return;
+            lastMessageTime = now;
+
             try {
                 const data = JSON.parse(msg.toString());
                 if (!isValidWsInput(data)) return;
@@ -38,6 +47,7 @@ const wsHandler = (ws: WebSocket, request: FastifyRequest) => {
         });
     }
     catch (error) {
+        // ... (rest of error handling remains same)
         switch (error.code) {
             case 'ACCESS_TOKEN_MISSING':
                 ws.close(1008, 'ACCESS_TOKEN_MISSING');

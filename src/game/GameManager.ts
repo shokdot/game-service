@@ -80,6 +80,13 @@ export class GameManager {
                     clearTimeout(p.reconnectTimer);
                     p.reconnectTimer = undefined;
                 }
+                // Proactively close old socket
+                try {
+                    if (p.socket !== socket) {
+                        p.socket.close(1000, 'Reconnected from other location');
+                    }
+                } catch { }
+
                 p.socket = socket;
                 p.isConnected = true;
 
