@@ -19,4 +19,4 @@ async function registerRoutes(app: FastifyInstance) {
     await app.register(gameRoutes, { prefix: `${API_PREFIX}/games` });
 }
 
-startServer(app, registerRoutes, HOST, PORT);
+startServer(app, registerRoutes, HOST, PORT, SERVICE_NAME);
