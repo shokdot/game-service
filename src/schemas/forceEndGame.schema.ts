@@ -1,6 +1,5 @@
 import { RouteShorthandOptions } from "fastify";
-import { errorResponseSchema } from '@core/schemas/error.schema.js'
-import serviceAuth from "@core/middlewares/serviceAuth.middleware.js";
+import { errorResponseSchema, serviceAuth } from '@core/index.js';
 
 const forceEndGameSchema: RouteShorthandOptions =
 {

@@ -3,7 +3,7 @@ import { FastifyRequest } from "fastify";
 import { gameManager } from "src/game/GameManager.js";
 import { roomByIdDTO } from "src/dto/room-by-id.dto.js";
 import { isValidWsInput } from "src/dto/ws-input.dto.js";
-import authenticateWs from '@core/utils/authenticate.ws.js'
+import { authenticateWs } from '@core/index.js'
 
 const wsHandler = (ws: WebSocket & { isAlive?: boolean }, request: FastifyRequest) => {
     try {

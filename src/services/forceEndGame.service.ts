@@ -1,4 +1,4 @@
-import { AppError } from "@core/utils/AppError.js";
+import { AppError } from "@core/index.js";
 import { gameManager } from "../game/GameManager.js";
 
 const forceEndGame = (roomId: string) => {

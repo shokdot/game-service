@@ -1,4 +1,4 @@
-import { AppError } from "@core/utils/AppError.js";
+import { AppError } from "@core/index.js";
 import { gameManager } from "src/game/GameManager.js";
 
 const createGame = (roomId: string, userIds: string[], winScore?: number) => {
