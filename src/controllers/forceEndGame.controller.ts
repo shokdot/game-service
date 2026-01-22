@@ -1,6 +1,6 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { forceEndGame } from "@services/index.js";
-import { sendError } from "@core/index.js";
+import { sendError, AppError } from "@core/index.js";
 import { roomByIdDTO } from "src/dto/room-by-id.dto.js";
 
 const forceEndGameHandler = (request: FastifyRequest<{ Params: roomByIdDTO }>, reply: FastifyReply) => {
@@ -17,14 +17,10 @@ const forceEndGameHandler = (request: FastifyRequest<{ Params: roomByIdDTO }>, r
 
 	}
 	catch (error: any) {
-		switch (error.code) {
-			case 'GAME_NOT_FOUND':
-				return sendError(reply, 404, error.code, 'The requested game was not found.');
-			case 'UNHANDLED_ERROR':
-				return sendError(reply, 500, error.code, 'An unexpected error occurred.');
-			default:
-				return sendError(reply, 500, 'INTERNAL_SERVER_ERROR', 'Internal server error');
+		if (error instanceof AppError) {
+			return sendError(reply, error);
 		}
+		return sendError(reply, 500, 'INTERNAL_SERVER_ERROR', 'Internal server error');
 	}
 };
 

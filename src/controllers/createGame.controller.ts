@@ -1,4 +1,4 @@
-import { sendError } from "@core/index.js";
+import { sendError, AppError } from "@core/index.js";
 import { createGame } from "@services/index.js";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { CreateGameDTO } from "src/dto/create-game.dto.js";
@@ -15,13 +15,11 @@ const createGameHandler = async (request: FastifyRequest<{ Body: CreateGameDTO }
 			message: `Game created for room: ${roomId}`,
 		});
 
-	} catch (error) {
-		switch (error.code) {
-			case "GAME_ALREADY_EXISTS":
-				return sendError(reply, 404, error.code, "A game with this ID already exists.'");
-			default:
-				return sendError(reply, 500, 'INTERNAL_SERVER_ERROR', 'Internal server error');
+	} catch (error: any) {
+		if (error instanceof AppError) {
+			return sendError(reply, error);
 		}
+		return sendError(reply, 500, 'INTERNAL_SERVER_ERROR', 'Internal server error');
 	}
 };
 
