@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { WebSocket } from 'ws';
 import { FastifyInstance } from 'fastify';
 import { buildApp, startServer, API_PREFIX, healthRoutes } from '@core/index.js';
 import { PORT, HOST, SERVICE_NAME } from './utils/env.js';
@@ -19,13 +20,13 @@ const heartbeatInterval = setInterval(() => {
 		const game = gameManager.getGame(roomId);
 		if (game) {
 			game.players.forEach(player => {
-				const ws = player.socket as any;
+				const socket = player.socket as WebSocket & { isAlive?: boolean };
 				if (player.socket.readyState === WebSocket.OPEN) {
-					if (ws.isAlive === false) {
+					if (socket.isAlive === false) {
 						player.socket.terminate();
 						return;
 					}
-					ws.isAlive = false;
+					socket.isAlive = false;
 					player.socket.ping();
 				} else {
 					player.socket.terminate();

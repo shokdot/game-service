@@ -136,6 +136,7 @@ export class GameInstance {
             if (score.player1 >= this.winScore) {
                 this.stop();
                 this.triggerGameEnd(1);
+                return;
             }
             this.resetBall();
         }

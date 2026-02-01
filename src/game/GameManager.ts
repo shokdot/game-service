@@ -234,7 +234,7 @@ export class GameManager {
 
 	private async notifyRoomServiceLeave(roomId: string, userId: string) {
 		try {
-			const url = `${ROOM_SERVICE_URL}/${roomId}/internal/leave`;
+			const url = `${ROOM_SERVICE_URL}/internal/${roomId}/leave`;
 
 			await axios.post(url, {
 				userId
@@ -252,17 +252,19 @@ export class GameManager {
 
 	private async notifyRoomServiceFinish(roomId: string, players: Player[], result?: GameResult) {
 		try {
-			const url = `${ROOM_SERVICE_URL}/${roomId}/internal/finish`;
+			const url = `${ROOM_SERVICE_URL}/internal/${roomId}/finish`;
 
+			// Room-service expects winner/playerNumber as 0 or 1; game uses 1 or 2
+			const winnerIndex = result?.winner != null ? result.winner - 1 : undefined;
 			await axios.post(url, {
-				winner: result?.winner,
+				winner: winnerIndex,
 				finalScore: result?.finalScore,
 				gameDuration: result?.gameDuration,
 				startTime: result?.startTime,
 				endTime: result?.endTime,
 				players: players.map(p => ({
 					userId: p.userId,
-					playerNumber: p.playerNumber
+					playerNumber: p.playerNumber - 1
 				}))
 			}, {
 				headers: {
