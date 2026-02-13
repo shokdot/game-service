@@ -60,11 +60,23 @@ ws.send(JSON.stringify({ type: 'input', direction: 1 }));
 
 ---
 
-## 3. Handle game state and end of game
+## 3. Handle server messages
 
-**State updates:** Parse incoming JSON and update UI (positions, score, etc.). Structure is defined by the game logic (see backend or API docs).
+All server messages are JSON with a `type` field. Handle them in `ws.onmessage`:
 
-**End of game:** Server may send a final state or close the connection. On close, redirect to lobby or match history (e.g. stats-service).
+| Type | When | What to do |
+|------|------|------------|
+| `player_assignment` | Right after connect | Store `playerNumber` (1 or 2) to determine which paddle is yours and whether to mirror the view. Use `players` array (userIds) to fetch opponent's profile |
+| `countdown` | Both players connected | Show countdown overlay (3, 2, 1). Game starts after countdown reaches 0 |
+| `state` | Every tick (~60 fps) | Update game rendering (paddles, ball, score). First `state` message means game has started |
+| `reconnected` | After reconnecting | Restore `playerNumber` and game state; use `players` array to fetch opponent info; countdown will follow |
+| `game_resumed` | Opponent reconnected | Both players back — countdown will follow before gameplay resumes |
+| `opponent_disconnected` | Opponent lost connection | Show reconnection countdown (30 s) |
+| `opponent_left_permanently` | Opponent timed out | Show win screen |
+| `you_win` / `you_lose` | Game ended normally | Show result screen with `result.finalScore` and `result.gameDuration` |
+| `game_end` | Final signal | Close connection, redirect to lobby or stats |
+
+**Important:** Use the `playerNumber` from `player_assignment` to determine perspective. Player 1 controls the left paddle; Player 2 controls the right paddle. Mirror ball position and scores accordingly for Player 2.
 
 ---
 
@@ -73,8 +85,9 @@ ws.send(JSON.stringify({ type: 'input', direction: 1 }));
 1. **Lobby / matchmaking** (room-service): Create room, join room, or enter matchmaking queue → get `roomId`.
 2. **Navigate to game:** Open `/game/:roomId` (or similar).
 3. **Connect WebSocket:** Open `wss://.../api/v1/games/ws/:roomId` with Bearer token.
-4. **Play:** Send `{ type: "input", direction }` on user input; render state from server messages.
-5. **Leave / end:** On disconnect or game over, close WebSocket and redirect (e.g. to lobby or stats).
+4. **Wait for countdown:** Both players connect → server sends `countdown` (3, 2, 1) → show overlay.
+5. **Play:** After countdown, server sends `state` messages at 60 fps. Send `{ type: "input", direction }` on user input; render state.
+6. **Leave / end:** On disconnect or game over, close WebSocket and redirect (e.g. to lobby or stats).
 
 ---
 

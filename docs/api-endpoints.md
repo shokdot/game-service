@@ -35,7 +35,20 @@ Connect to the game for a room. **Auth:** Bearer access token in `Authorization`
 
 ## Server → client (WebSocket)
 
-Game state updates are sent as JSON; structure is service-specific (e.g. paddles, ball, score). Parse and render in the game UI.
+All messages are JSON with a `type` field:
+
+| Type | Payload | Description |
+|------|---------|-------------|
+| `player_assignment` | `{ playerNumber: 1 \| 2, players: string[] }` | Sent once on connect — tells the client which paddle they control and includes all player userIds |
+| `countdown` | `{ count: number }` | Countdown tick (3, 2, 1) before game starts/resumes |
+| `state` | `{ state: GameState }` | Periodic game state update (60 fps) — first `state` means game has started |
+| `reconnected` | `{ state: GameState, playerNumber: 1 \| 2, players: string[] }` | Sent on reconnection with current state, player number, and all player userIds |
+| `game_resumed` | — | Both players reconnected — countdown will follow |
+| `opponent_disconnected` | `{ userId: string }` | Opponent lost connection (30 s to reconnect) |
+| `opponent_left_permanently` | — | Opponent did not reconnect in time |
+| `you_win` | `{ result: GameResult }` | You won the game |
+| `you_lose` | `{ result: GameResult }` | You lost the game |
+| `game_end` | — | Final signal — connection will close |
 
 ---
 

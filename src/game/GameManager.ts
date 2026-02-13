@@ -5,11 +5,14 @@ import { SERVICE_TOKEN, ROOM_SERVICE_URL, USER_SERVICE_URL } from 'src/utils/env
 import axios from 'axios';
 import { AppError } from '@core/index.js';
 
+const COUNTDOWN_SECONDS = 3;
+
 export class GameManager {
 	private games = new Map<string, {
 		instance: GameInstance,
 		players: Set<Player>,
-		allowedUserIds: Set<string>
+		allowedUserIds: Set<string>,
+		countdownTimer?: NodeJS.Timeout
 	}>();
 
 	public createGame(roomId: string, userIds: string[], winScore?: number) {
@@ -90,13 +93,13 @@ export class GameManager {
 				p.socket = socket;
 				p.isConnected = true;
 
-				// Notify player of current state
-				socket.send(JSON.stringify({ type: "reconnected", state: game.instance.getState() }));
+				// Notify player of current state (include playerNumber so client can restore perspective)
+				socket.send(JSON.stringify({ type: "reconnected", state: game.instance.getState(), playerNumber: p.playerNumber, players: [...game.allowedUserIds] }));
 
-				// Resume game if both are connected and there are exactly 2 players
+				// Resume game with countdown if both are connected
 				if (game.players.size === 2 && [...game.players].every(player => player.isConnected) && !game.instance.isRunning()) {
-					game.instance.start();
 					this.broadcast(roomId, { type: "game_resumed" });
+					this.startCountdown(roomId);
 				}
 				return true;
 			}
@@ -117,8 +120,13 @@ export class GameManager {
 
 		game.players.add(player);
 
+		// Tell the client which player number they are (include all player userIds)
+		if (socket.readyState === WebSocket.OPEN) {
+			socket.send(JSON.stringify({ type: "player_assignment", playerNumber, players: [...game.allowedUserIds] }));
+		}
+
 		if (game.players.size === 2 && !game.instance.isRunning()) {
-			game.instance.start();
+			this.startCountdown(roomId);
 			// Update status for both players
 			for (const p of game.players) {
 				this.updateUserStatus(p.userId, 'IN_GAME').catch(console.error);
@@ -126,6 +134,37 @@ export class GameManager {
 		}
 
 		return true;
+	}
+
+	private startCountdown(roomId: string): void {
+		const game = this.getGame(roomId);
+		if (!game) return;
+
+		// Cancel any existing countdown
+		if (game.countdownTimer) {
+			clearInterval(game.countdownTimer);
+		}
+
+		let count = COUNTDOWN_SECONDS;
+		this.broadcast(roomId, { type: "countdown", count });
+
+		game.countdownTimer = setInterval(() => {
+			count--;
+			if (count > 0) {
+				this.broadcast(roomId, { type: "countdown", count });
+			} else {
+				clearInterval(game.countdownTimer!);
+				game.countdownTimer = undefined;
+
+				// Verify both players are still connected before starting
+				const allConnected = game.players.size === 2
+					&& [...game.players].every(p => p.isConnected);
+
+				if (allConnected && !game.instance.isRunning()) {
+					game.instance.start();
+				}
+			}
+		}, 1000);
 	}
 
 	public handleDisconnect(roomId: string, socket: WebSocket) {
@@ -143,6 +182,12 @@ export class GameManager {
 		if (!disconnectedPlayer || !disconnectedPlayer.isConnected) return;
 
 		disconnectedPlayer.isConnected = false;
+
+		// Cancel any running countdown
+		if (game.countdownTimer) {
+			clearInterval(game.countdownTimer);
+			game.countdownTimer = undefined;
+		}
 
 		// Pause game
 		if (game.instance.isRunning()) {
@@ -184,6 +229,13 @@ export class GameManager {
 		this.updateUserStatus(removedPlayer.userId, 'ONLINE').catch(console.error);
 
 		if (game.players.size === 0) {
+			// All connected players gone – also remove any allowed users who never
+			// connected so the room-service room is fully cleaned up.
+			for (const uid of game.allowedUserIds) {
+				if (uid !== removedPlayer.userId) {
+					this.notifyRoomServiceLeave(roomId, uid);
+				}
+			}
 			this.games.delete(roomId);
 			return true;
 		}
@@ -202,6 +254,11 @@ export class GameManager {
 
 		const game = this.getGame(roomId);
 		if (!game) return false;
+
+		if (game.countdownTimer) {
+			clearInterval(game.countdownTimer);
+			game.countdownTimer = undefined;
+		}
 
 		if (game.instance.isRunning()) {
 			game.instance.stop();
@@ -302,6 +359,9 @@ export class GameManager {
 	public forceCleanup(): void {
 		try {
 			for (const [, game] of this.games) {
+				if (game.countdownTimer) {
+					clearInterval(game.countdownTimer);
+				}
 				if (game.instance.isRunning()) {
 					game.instance.stop();
 				}
