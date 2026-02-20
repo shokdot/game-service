@@ -28,15 +28,17 @@ const wsHandler = (ws: WebSocket & { isAlive?: boolean }, request: FastifyReques
 		gameManager.addPlayer(roomId, userId, ws);
 
 		let lastMessageTime = 0;
-		const MIN_MESSAGE_INTERVAL = 50; // Max 20 messages per second
+		const MIN_MESSAGE_INTERVAL = 20; // Max 50 messages per second
 
 		ws.on('message', (msg) => {
-			const now = Date.now();
-			if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) return;
-			lastMessageTime = now;
-
 			try {
 				const data = JSON.parse(msg.toString());
+
+				if (data.direction !== 0 && data.type !== "leave") {
+					const now = Date.now();
+					if (now - lastMessageTime < MIN_MESSAGE_INTERVAL) return;
+					lastMessageTime = now;
+				}
 
 				if (data.type === "leave") {
 					gameManager.removePlayer(roomId, ws);

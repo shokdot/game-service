@@ -121,12 +121,20 @@ export class GameInstance {
 			ball.vy *= -1;
 		}
 
-		if (ball.x <= PADDLE_OFFSET + PADDLE_WIDTH && this.collides(ball.y, p1.y)) {
+		if (
+			ball.x <= PADDLE_OFFSET + PADDLE_WIDTH &&
+			ball.x + BALL_SIZE >= PADDLE_OFFSET &&
+			this.collides(ball.y, p1.y)
+		) {
 			ball.vx = Math.abs(ball.vx);
 			this.addRandomSpin(ball);
 		}
 
-		if (ball.x + BALL_SIZE >= GAME_WIDTH - PADDLE_OFFSET - PADDLE_WIDTH && this.collides(ball.y, p2.y)) {
+		if (
+			ball.x + BALL_SIZE >= GAME_WIDTH - PADDLE_OFFSET - PADDLE_WIDTH &&
+			ball.x <= GAME_WIDTH - PADDLE_OFFSET &&
+			this.collides(ball.y, p2.y)
+		) {
 			ball.vx = -Math.abs(ball.vx);
 			this.addRandomSpin(ball);
 		}
