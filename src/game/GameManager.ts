@@ -48,6 +48,18 @@ export class GameManager {
 			allowedUserIds: new Set(userIds)
 		});
 
+		// Timeout to clean up if nobody connects
+		setTimeout(() => {
+			const current = this.games.get(roomId);
+			if (current && current.players.size === 0) {
+				this.games.delete(roomId);
+				for (const uid of userIds) {
+					this.notifyRoomServiceLeave(roomId, uid);
+					this.updateUserStatus(uid, 'ONLINE').catch(console.error);
+				}
+			}
+		}, 15000);
+
 		return this.games.get(roomId);
 	}
 
@@ -202,7 +214,7 @@ export class GameManager {
 		}, 30000); // 30 seconds
 	}
 
-	public removePlayer(roomId: string, socket: WebSocket, isTimeout = false) {
+	public async removePlayer(roomId: string, socket: WebSocket, isTimeout = false) {
 		const game = this.getGame(roomId);
 		if (!game) return false;
 
@@ -225,7 +237,9 @@ export class GameManager {
 
 		try { socket.close(); } catch { }
 
-		this.notifyRoomServiceLeave(roomId, removedPlayer.userId);
+		// Await room-service leave so the room is cleaned up before the user
+		// can navigate away and send a new invite (fixes re-invite failure).
+		await this.notifyRoomServiceLeave(roomId, removedPlayer.userId);
 		this.updateUserStatus(removedPlayer.userId, 'ONLINE').catch(console.error);
 
 		if (game.players.size === 0) {
@@ -233,24 +247,50 @@ export class GameManager {
 			// connected so the room-service room is fully cleaned up.
 			for (const uid of game.allowedUserIds) {
 				if (uid !== removedPlayer.userId) {
-					this.notifyRoomServiceLeave(roomId, uid);
+					await this.notifyRoomServiceLeave(roomId, uid);
 				}
 			}
 			this.games.delete(roomId);
 			return true;
 		}
 
-		const winner = [...game.players][0];
-		if (winner && winner.socket.readyState === WebSocket.OPEN) {
-			winner.socket.send(JSON.stringify({ type: "opponent_left_permanently" }));
+		// Player explicitly left — notify opponent but do NOT declare
+		// a winner and do NOT save match results.
+		const remaining = [...game.players][0];
+		if (remaining && remaining.socket.readyState === WebSocket.OPEN) {
+			remaining.socket.send(JSON.stringify({ type: "opponent_left", userId: removedPlayer.userId }));
 		}
 
-		this.endGame(roomId);
+		// Clean up the game inline instead of calling endGame(), so we do NOT
+		// close the remaining player's socket.
+		if (game.countdownTimer) {
+			clearInterval(game.countdownTimer);
+			game.countdownTimer = undefined;
+		}
+		if (game.instance.isRunning()) {
+			game.instance.stop();
+		}
+
+		// Clear any reconnect timers on the remaining player
+		for (const player of game.players) {
+			if (player.reconnectTimer) {
+				clearTimeout(player.reconnectTimer);
+				player.reconnectTimer = undefined;
+			}
+		}
+
+		// Clean up room-service for all remaining players (no match result saved)
+		for (const player of game.players) {
+			await this.notifyRoomServiceLeave(roomId, player.userId);
+			this.updateUserStatus(player.userId, 'ONLINE').catch(console.error);
+		}
+
+		this.games.delete(roomId);
 
 		return true;
 	}
 
-	public endGame(roomId: string, result?: GameResult): boolean {
+	public endGame(roomId: string, result?: GameResult, explicitPlayers?: Player[]): boolean {
 
 		const game = this.getGame(roomId);
 		if (!game) return false;
@@ -277,12 +317,12 @@ export class GameManager {
 			} catch { }
 		}
 
-		const players = Array.from(game.players);
+		const playersToNotify = explicitPlayers || Array.from(game.players);
 		this.games.delete(roomId);
 
-		this.notifyRoomServiceFinish(roomId, players, result);
+		this.notifyRoomServiceFinish(roomId, playersToNotify, result);
 
-		for (const player of game.players) {
+		for (const player of playersToNotify) {
 			this.updateUserStatus(player.userId, 'ONLINE').catch(console.error);
 		}
 

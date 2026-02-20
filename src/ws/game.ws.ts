@@ -37,6 +37,12 @@ const wsHandler = (ws: WebSocket & { isAlive?: boolean }, request: FastifyReques
 
 			try {
 				const data = JSON.parse(msg.toString());
+
+				if (data.type === "leave") {
+					gameManager.removePlayer(roomId, ws);
+					return;
+				}
+
 				if (!isValidWsInput(data)) return;
 
 				const player = [...game.players].find(p => p.socket === ws);

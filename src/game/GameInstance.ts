@@ -81,6 +81,14 @@ export class GameInstance {
 		return this.running;
 	}
 
+	public getScore(): { player1: number; player2: number } {
+		return this.state.score;
+	}
+
+	public getStartTime(): Date | undefined {
+		return this.startTime;
+	}
+
 	private update(): void {
 		if (!this.running) return;
 
