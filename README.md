@@ -1,11 +1,8 @@
 # Game Service
 
-Game session microservice for the ft_transcendence platform. Runs real-time Pong (or similar) games: WebSocket per room for gameplay input and state updates; internal API for room-service to create/end games.
+> Part of the [ft_transcendence](https://github.com/shokdot/ft_transcendence) project.
 
-## Features
-
-- **WebSocket game**: Connect to a room with Bearer token; send input (direction), receive game state
-- **Internal API**: Create game (room-service), force end game, get game state (service token)
+Real-time Pong game session microservice. Manages game instances per room via WebSocket: players send directional input and receive game state at ~60 fps. Internal API allows room-service to create, query, and force-end games.
 
 ## Tech Stack
 
@@ -15,21 +12,10 @@ Game session microservice for the ft_transcendence platform. Runs real-time Pong
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 20+
-- Environment variables (see [Environment](#environment))
-
-### Install & Run
-
 ```bash
 npm install
 npm run dev
 ```
-
-- **Dev**: `npm run dev`
-- **Build**: `npm run build`
-- **Start**: `npm start` (production)
 
 Service listens on `HOST:PORT` (default `0.0.0.0:3003`).
 
@@ -39,43 +25,95 @@ Built from monorepo root; see project `Dockerfile` and `docker-compose*.yml`.
 
 ## Environment
 
-| Variable             | Required | Description                    |
-|----------------------|----------|--------------------------------|
-| `PORT`               | No       | Server port (default: 3003)    |
-| `HOST`               | No       | Bind address (default: 0.0.0.0)|
-| `SERVICE_TOKEN`      | Yes      | Service-to-service token       |
-| `JWT_SECRET`         | Yes      | Access token verification      |
-| `JWT_REFRESH_SECRET` | Yes      | Refresh token (if needed)      |
-| `JWT_TWO_FA`         | Yes      | 2FA token (if needed)          |
-| `ROOM_SERVICE_URL`   | Yes      | Room service base URL          |
-| `USER_SERVICE_URL`   | Yes      | User service base URL          |
+| Variable             | Required | Description                      |
+|----------------------|----------|----------------------------------|
+| `PORT`               | No       | Server port (default: 3003)      |
+| `HOST`               | No       | Bind address (default: 0.0.0.0)  |
+| `SERVICE_TOKEN`      | Yes      | Service-to-service token         |
+| `JWT_SECRET`         | Yes      | Access token verification        |
+| `ROOM_SERVICE_URL`   | Yes      | Room service base URL            |
+| `USER_SERVICE_URL`   | Yes      | User service base URL            |
 
-API prefix defaults to `/api/v1` (from core).
+---
 
-## API Base URL
+## API Endpoints
 
-- **WebSocket (frontend):** `ws://{host}:{port}/api/v1/games/ws/:roomId` — **Auth: Bearer**
-- **Internal:** `POST /api/v1/games/internal`, `DELETE /api/v1/games/internal/:roomId`, `GET /api/v1/games/internal/:roomId` (service token)
+Base URL: **`{GAME_SERVICE_URL}/api/v1/games`**
 
-## Documentation
+---
 
-- **[API Endpoints](docs/api-endpoints.md)** — WebSocket URL, auth, input format, internal API.
-- **[Frontend Integration Guide](docs/frontend-integration-guide.md)** — How to connect and play from React/Next.js.
+### WebSocket (frontend)
 
-## Project Structure
+#### `GET /ws/:roomId` (WebSocket Upgrade)
 
+Connect to the game for a specific room. **Auth:** `Authorization: Bearer <accessToken>` header.
+
+**URL:** `ws://{host}:{port}/api/v1/games/ws/:roomId` (or `wss://` in production)
+
+**Params:** `roomId` — Room ID from room-service
+
+User must be a player in that room. On auth failure or invalid room, the server closes the connection:
+- `1008` — Invalid token
+- `4003` — Not allowed in this room
+- `4004` — Game not found
+
+---
+
+#### Client → Server (WebSocket)
+
+**Input message:**
+
+```json
+{
+  "type": "input",
+  "direction": -1
+}
 ```
-src/
-├── controllers/   # createGame, forceEndGame, getGameState
-├── game/           # GameInstance, GameManager, constants, types
-├── ws/             # WebSocket handler
-├── routes/         # public (ws, getGameState) + internal
-├── schemas/        # Validation
-├── services/       # Business logic
-├── dto/            # ws input, room-by-id
-└── utils/          # env
-```
 
-## License
+`direction`: `-1` (up/left), `0` (neutral), `1` (down/right). Rate-limited to ~20/sec.
 
-Part of ft_transcendence project.
+---
+
+#### Server → Client (WebSocket)
+
+| Type                        | Payload                                                          | Description                                                  |
+|-----------------------------|------------------------------------------------------------------|--------------------------------------------------------------|
+| `player_assignment`         | `{ playerNumber: 1\|2, players: string[] }`                     | Sent on connect — which paddle you control + all player IDs  |
+| `countdown`                 | `{ count: number }`                                              | Countdown tick (3, 2, 1) before game starts/resumes          |
+| `state`                     | `{ state: GameState }`                                           | Periodic game state update (~60 fps). First = game started   |
+| `reconnected`               | `{ state: GameState, playerNumber: 1\|2, players: string[] }`   | Sent on reconnect with current state and player info         |
+| `game_resumed`              | —                                                                | Both players reconnected — countdown follows                 |
+| `opponent_disconnected`     | `{ userId: string }`                                             | Opponent lost connection (30s to reconnect)                  |
+| `opponent_left_permanently` | —                                                                | Opponent did not reconnect in time                           |
+| `you_win`                   | `{ result: GameResult }`                                         | You won                                                      |
+| `you_lose`                  | `{ result: GameResult }`                                         | You lost                                                     |
+| `game_end`                  | —                                                                | Final signal — connection will close                         |
+
+---
+
+### Internal API (backend only)
+
+**Auth:** Service token (`x-service-token` header). Not for frontend use.
+
+#### `POST /internal`
+
+Create a game for a room (called by room-service). Body is service-specific (e.g. `roomId`, `winScore`).
+
+#### `GET /internal/:roomId`
+
+Get current game state for a room. Not for frontend (frontend uses WebSocket).
+
+#### `DELETE /internal/:roomId`
+
+Force end a game in a room.
+
+---
+
+### Summary
+
+| Type      | Path                      | Auth    | Purpose                 |
+|-----------|---------------------------|---------|-------------------------|
+| WebSocket | `/ws/:roomId`             | Bearer  | Play game (input+state) |
+| HTTP POST | `/internal`               | Service | Create game             |
+| HTTP GET  | `/internal/:roomId`       | Service | Get game state          |
+| HTTP DEL  | `/internal/:roomId`       | Service | Force end game          |
